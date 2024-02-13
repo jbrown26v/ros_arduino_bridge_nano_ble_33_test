@@ -45,42 +45,32 @@
  *  POSSIBILITY OF SUCH DAMAGE.
  *********************************************************************/
 
-#define USE_BASE      // Enable the base controller code
-//#undef USE_BASE     // Disable the base controller code
 
-/* Define the motor controller and encoder library you are using */
-#ifdef USE_BASE
+
+
+
    /*MICROSTEP driver*/
-   #define MICROSTEP_DRIVER
-#endif
 
 
-/* Serial port baud rate */
-#define BAUDRATE     115200
 
 #if defined(ARDUINO) && ARDUINO >= 100
-#include "Arduino.h"
+  #include "Arduino.h"
 #else
-#include "WProgram.h"
+  #include "WProgram.h"
 #endif
 
 /* Include definition of serial commands */
 #include "commands.h"
 
-#ifdef USE_BASE
-  /*include stepper library*/
-  #include <Stepper.h>
-
-  /* Motor driver function definitions */
-  #include "motor_driver.h"
-  
-#endif
+#define dirPin 3
+#define stepPin 2
+#define stepsPerRevolution 1600
 
 /* Variable initialization */
 
 // A pair of varibles to help parse serial commands (thanks Fergs)
 int arg = 0;
-int index = 0;
+int ind = 0;
 
 // Variable to hold an input character
 char chr;
@@ -104,7 +94,7 @@ void resetCommand() {
   arg1 = 0;
   arg2 = 0;
   arg = 0;
-  index = 0;
+  ind = 0;
 }
 
 /* Run a command.  Commands are defined in commands.h */
@@ -117,9 +107,6 @@ int runCommand() {
   arg2 = atoi(argv2);
   
   switch(cmd) {
-  case GET_BAUDRATE:
-    Serial.println(BAUDRATE);
-    break;
   case ANALOG_READ:
     Serial.println(analogRead(arg1));
     break;
@@ -135,28 +122,32 @@ int runCommand() {
     else if (arg2 == 1) digitalWrite(arg1, HIGH);
     Serial.println("OK"); 
     break;
-  case PING:
-    Serial.println(Ping(arg1));
-    break;
-#endif
-    
-#ifdef USE_BASE
   case MOTOR_STEP:
-    send_steps(arg1)
-    Serial.println("OK"); 
+    send_steps(arg1);
+    Serial.println("sent"); 
     break;
-#endif
+
   default:
     Serial.println("Invalid Command");
     break;
   }
 }
 
+void send_steps(int steps) {
+  for (int i=0; i < steps; i++) {
+    // These four lines result in 1 step:
+    digitalWrite(stepPin, HIGH);
+    delayMicroseconds(500);
+    digitalWrite(stepPin, LOW);
+    delayMicroseconds(500);
+  }
+}
+
 /* Setup function--runs once at startup. */
 void setup() {
-  Serial.begin(BAUDRATE);
-
-
+  pinMode(stepPin, OUTPUT);
+  pinMode(dirPin, OUTPUT);
+  Serial.begin(115200);
 }
 
 /* Enter the main loop.  Read and parse input from the serial port
@@ -171,8 +162,8 @@ void loop() {
 
     // Terminate a command with a CR
     if (chr == 13) {
-      if (arg == 1) argv1[index] = NULL;
-      else if (arg == 2) argv2[index] = NULL;
+      if (arg == 1) argv1[ind] = NULL;
+      else if (arg == 2) argv2[ind] = NULL;
       runCommand();
       resetCommand();
     }
@@ -181,9 +172,9 @@ void loop() {
       // Step through the arguments
       if (arg == 0) arg = 1;
       else if (arg == 1)  {
-        argv1[index] = NULL;
+        argv1[ind] = NULL;
         arg = 2;
-        index = 0;
+        ind = 0;
       }
       continue;
     }
@@ -194,15 +185,16 @@ void loop() {
       }
       else if (arg == 1) {
         // Subsequent arguments can be more than one character
-        argv1[index] = chr;
-        index++;
+        argv1[ind] = chr;
+        ind++;
       }
       else if (arg == 2) {
-        argv2[index] = chr;
-        index++;
+        argv2[ind] = chr;
+        ind++;
       }
     }
   }
 
 }
+
 
